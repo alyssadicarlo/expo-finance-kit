@@ -33,9 +33,15 @@ npm install expo-finance-kit
 ## Usage
 
 ```typescript
-import ExpoFinanceKit from 'expo-finance-kit';
+import ExpoFinanceKit, { isFinanceKitModuleAvailable } from 'expo-finance-kit';
 
-// Check if FinanceKit is available
+// Check if the native module is loaded (important for new architecture)
+if (!isFinanceKitModuleAvailable()) {
+  console.log('FinanceKit module not yet loaded');
+  return;
+}
+
+// Check if FinanceKit is available on this device
 if (ExpoFinanceKit.isAvailable) {
   // Request authorization
   const granted = await ExpoFinanceKit.requestAuthorization();

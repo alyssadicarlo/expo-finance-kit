@@ -37,3 +37,8 @@ class ExpoFinanceKitModule extends NativeModule<ExpoFinanceKitModuleEvents> {
 }
 
 export default registerWebModule(ExpoFinanceKitModule, 'ExpoFinanceKitModule');
+
+// Export a function to check if the module is available (always false on web)
+export const isFinanceKitModuleAvailable = (): boolean => {
+  return false;
+};

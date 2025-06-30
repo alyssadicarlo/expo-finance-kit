@@ -19,8 +19,12 @@ export default function App() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setIsAvailable(ExpoFinanceKit.isAvailable);
-    checkAuthStatus();
+    // Safely check if module is available first
+    const moduleAvailable = ExpoFinanceKit?.isAvailable ?? false;
+    setIsAvailable(moduleAvailable);
+    if (moduleAvailable) {
+      checkAuthStatus();
+    }
   }, []);
 
   const checkAuthStatus = async () => {
