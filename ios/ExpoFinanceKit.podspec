@@ -11,14 +11,15 @@ Pod::Spec.new do |s|
   s.author         = package['author']
   s.homepage       = package['homepage']
   s.platforms      = {
-    :ios => '15.1',
-    :tvos => '15.1'
+    :ios => '17.4'
   }
   s.swift_version  = '5.4'
   s.source         = { git: 'https://github.com/alyssadicarlo/expo-finance-kit' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
+  
+  s.frameworks = 'FinanceKit'
 
   # Swift/Objective-C compatibility
   s.pod_target_xcconfig = {

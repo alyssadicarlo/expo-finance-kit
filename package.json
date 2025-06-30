@@ -1,7 +1,7 @@
 {
-  "name": "expo-finance-kit",
+  "name": "@dicarlosoftware/expo-finance-kit",
   "version": "0.1.0",
-  "description": "Expo module for integrating with FinanceKit",
+  "description": "Native Expo module for Apple FinanceKit - Access financial data from Apple Card and other accounts",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -19,7 +19,12 @@
     "react-native",
     "expo",
     "expo-finance-kit",
-    "ExpoFinanceKit"
+    "ExpoFinanceKit",
+    "financekit",
+    "apple-financekit",
+    "ios",
+    "financial-data",
+    "apple-card"
   ],
   "repository": "https://github.com/alyssadicarlo/expo-finance-kit",
   "bugs": {

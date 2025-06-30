@@ -1,14 +1,38 @@
 import { registerWebModule, NativeModule } from 'expo';
 
-import { ExpoFinanceKitModuleEvents } from './ExpoFinanceKit.types';
+import { 
+  ExpoFinanceKitModuleEvents,
+  AuthorizationStatus,
+  Account,
+  Transaction,
+  Balance
+} from './ExpoFinanceKit.types';
 
 class ExpoFinanceKitModule extends NativeModule<ExpoFinanceKitModuleEvents> {
-  PI = Math.PI;
-  async setValueAsync(value: string): Promise<void> {
-    this.emit('onChange', { value });
+  isAvailable = false;
+  
+  async requestAuthorization(): Promise<boolean> {
+    console.warn('FinanceKit is not available on web platform');
+    return false;
   }
-  hello() {
-    return 'Hello world! 👋';
+  
+  async getAuthorizationStatus(): Promise<AuthorizationStatus> {
+    return 'unavailable';
+  }
+  
+  async getAccounts(): Promise<Account[]> {
+    console.warn('FinanceKit is not available on web platform');
+    return [];
+  }
+  
+  async getTransactions(accountId?: string, startDate?: number, endDate?: number): Promise<Transaction[]> {
+    console.warn('FinanceKit is not available on web platform');
+    return [];
+  }
+  
+  async getBalance(accountId: string): Promise<Balance> {
+    console.warn('FinanceKit is not available on web platform');
+    throw new Error('FinanceKit is not available on web platform');
   }
 }
 

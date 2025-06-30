@@ -1,11 +1,21 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import { ExpoFinanceKitModuleEvents } from './ExpoFinanceKit.types';
+import { 
+  ExpoFinanceKitModuleEvents, 
+  Account, 
+  Transaction, 
+  Balance,
+  AuthorizationStatus
+} from './ExpoFinanceKit.types';
 
 declare class ExpoFinanceKitModule extends NativeModule<ExpoFinanceKitModuleEvents> {
-  PI: number;
-  hello(): string;
-  setValueAsync(value: string): Promise<void>;
+  isAvailable: boolean;
+  
+  requestAuthorization(): Promise<boolean>;
+  getAuthorizationStatus(): Promise<AuthorizationStatus>;
+  getAccounts(): Promise<Account[]>;
+  getTransactions(accountId?: string, startDate?: number, endDate?: number): Promise<Transaction[]>;
+  getBalance(accountId: string): Promise<Balance>;
 }
 
 // This call loads the native module object from the JSI.
