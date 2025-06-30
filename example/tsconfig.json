@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "expo-finance-kit": ["../src/index"],
+      "expo-finance-kit/*": ["../src/*"]
+    }
+  }
+}
