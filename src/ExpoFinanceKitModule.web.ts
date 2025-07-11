@@ -5,7 +5,7 @@ import {
   AuthorizationStatus,
   Account,
   Transaction,
-  Balance
+  AccountBalance
 } from './ExpoFinanceKit.types';
 
 class ExpoFinanceKitModule extends NativeModule<ExpoFinanceKitModuleEvents> {
@@ -30,7 +30,7 @@ class ExpoFinanceKitModule extends NativeModule<ExpoFinanceKitModuleEvents> {
     return [];
   }
   
-  async getBalance(accountId: string): Promise<Balance> {
+  async getBalance(accountId: string): Promise<AccountBalance> {
     console.warn('FinanceKit is not available on web platform');
     throw new Error('FinanceKit is not available on web platform');
   }

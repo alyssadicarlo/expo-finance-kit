@@ -2,6 +2,20 @@
 
 Native Expo module for Apple FinanceKit - Access financial data from Apple Card and other accounts on iOS 17.4+.
 
+A comprehensive, type-safe library providing modular access to Apple's FinanceKit API with React hooks, formatters, analytics, and more.
+
+## Features
+
+- 🔐 **Authorization Management** - Handle FinanceKit permissions with ease
+- 💳 **Account Access** - Fetch and manage financial accounts
+- 📊 **Transaction History** - Query and analyze transaction data
+- 💰 **Balance Tracking** - Monitor account balances in real-time
+- 📈 **Analytics & Insights** - Generate spending insights and detect trends
+- ⚛️ **React Hooks** - Ready-to-use hooks for React Native apps
+- 🎨 **Formatters** - Currency, date, and number formatting utilities
+- 🛡️ **Type Safety** - Full TypeScript support with strict typing
+- 🚀 **Performance** - Built-in caching and optimization
+
 ## Installation
 
 ```bash
@@ -30,95 +44,231 @@ npm install expo-finance-kit
 
 4. FinanceKit requires iOS 17.4 or later.
 
-## Usage
+## Quick Start
+
+### Basic Usage
 
 ```typescript
-import ExpoFinanceKit, { isFinanceKitModuleAvailable } from 'expo-finance-kit';
+import { 
+  isFinanceKitAvailable,
+  requestAuthorization,
+  getAccounts,
+  getTransactions,
+  formatCurrency 
+} from 'expo-finance-kit';
 
-// Check if the native module is loaded (important for new architecture)
-if (!isFinanceKitModuleAvailable()) {
-  console.log('FinanceKit module not yet loaded');
+// Check if FinanceKit is available
+if (!isFinanceKitAvailable()) {
+  console.log('FinanceKit not available on this device');
   return;
 }
 
-// Check if FinanceKit is available on this device
-if (ExpoFinanceKit.isAvailable) {
-  // Request authorization
-  const granted = await ExpoFinanceKit.requestAuthorization();
+// Request authorization
+const { granted } = await requestAuthorization();
+
+if (granted) {
+  // Fetch accounts
+  const accounts = await getAccounts();
+  console.log(`Found ${accounts.length} accounts`);
   
-  if (granted) {
-    // Get accounts
-    const accounts = await ExpoFinanceKit.getAccounts();
-    
-    // Get transactions for an account
-    const transactions = await ExpoFinanceKit.getTransactions(
-      accounts[0].id,
-      Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
-      Date.now()
-    );
-    
-    // Get account balance
-    const balance = await ExpoFinanceKit.getBalance(accounts[0].id);
-  }
+  // Get recent transactions
+  const transactions = await getTransactions({
+    accountId: accounts[0].id,
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+    limit: 50
+  });
+  
+  // Format currency for display
+  transactions.forEach(transaction => {
+    console.log(`${transaction.merchantName}: ${formatCurrency(transaction.amount, transaction.currencyCode)}`);
+  });
 }
+```
+
+### Using React Hooks
+
+```typescript
+import React from 'react';
+import { View, Text, Button } from 'react-native';
+import { 
+  useAuthorizationStatus,
+  useAccounts,
+  useTransactions,
+  formatCurrency,
+  formatRelativeDate 
+} from 'expo-finance-kit';
+
+function MyFinanceApp() {
+  const { isAuthorized, requestAuthorization } = useAuthorizationStatus();
+  const { accounts, loading: accountsLoading } = useAccounts();
+  const { transactions, refetch } = useTransactions({ limit: 20 });
+
+  if (!isAuthorized) {
+    return (
+      <View>
+        <Text>Please authorize access to your financial data</Text>
+        <Button title="Authorize" onPress={requestAuthorization} />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Text>Accounts ({accounts.length})</Text>
+      {accounts.map(account => (
+        <Text key={account.id}>{account.displayName} - {account.institutionName}</Text>
+      ))}
+      
+      <Text>Recent Transactions</Text>
+      {transactions.map(transaction => (
+        <View key={transaction.id}>
+          <Text>{transaction.merchantName || transaction.transactionDescription}</Text>
+          <Text>{formatCurrency(transaction.amount, transaction.currencyCode)}</Text>
+          <Text>{formatRelativeDate(transaction.transactionDate)}</Text>
+        </View>
+      ))}
+      
+      <Button title="Refresh" onPress={refetch} />
+    </View>
+  );
+}
+```
+
+### Advanced Analytics
+
+```typescript
+import { 
+  generateSpendingInsights,
+  calculateTransactionStats,
+  findUnusualTransactions,
+  calculateSavingsRate 
+} from 'expo-finance-kit';
+
+// Generate spending insights for the last 30 days
+const endDate = new Date();
+const startDate = new Date();
+startDate.setDate(startDate.getDate() - 30);
+
+const insights = generateSpendingInsights(transactions, startDate, endDate);
+console.log(`Total spent: ${formatCurrency(insights.totalSpent, 'USD')}`);
+console.log(`Total income: ${formatCurrency(insights.totalIncome, 'USD')}`);
+
+// Calculate statistics
+const stats = calculateTransactionStats(transactions);
+console.log(`Average transaction: ${formatCurrency(stats.averageTransaction, 'USD')}`);
+console.log(`Savings rate: ${calculateSavingsRate(stats.totalIncome, stats.totalExpenses)}%`);
+
+// Find unusual transactions
+const unusual = findUnusualTransactions(transactions);
+console.log(`Found ${unusual.length} unusual transactions`);
+
+// Category breakdown
+insights.categoriesBreakdown.forEach(category => {
+  console.log(`${category.category}: ${category.percentage.toFixed(1)}% (${formatCurrency(category.amount, 'USD')})`);
+});
 ```
 
 ## API Reference
 
-### Constants
+### Core Functions
 
-- `isAvailable: boolean` - Whether FinanceKit is available on the current device
+#### Authorization
 
-### Methods
+- `requestAuthorization()` - Request access to financial data
+- `getAuthorizationStatus()` - Get current authorization status
+- `isFinanceKitAvailable()` - Check if FinanceKit is available
+- `ensureAuthorized()` - Helper to ensure authorization before data access
 
-#### `requestAuthorization(): Promise<boolean>`
-Request authorization to access financial data. Returns true if granted.
+#### Accounts
 
-#### `getAuthorizationStatus(): Promise<AuthorizationStatus>`
-Get the current authorization status. Returns one of:
-- `'notDetermined'`
-- `'denied'`
-- `'authorized'`
-- `'unavailable'`
+- `getAccounts()` - Fetch all accounts
+- `getAccountById(id)` - Get a specific account
+- `getAccountsByInstitution()` - Group accounts by institution
+- `getPrimaryAccount()` - Get the primary (first asset) account
 
-#### `getAccounts(): Promise<Account[]>`
-Get all available financial accounts.
+#### Transactions
 
-#### `getTransactions(accountId?: string, startDate?: number, endDate?: number): Promise<Transaction[]>`
-Get transactions for the specified account and date range.
+- `getTransactions(options)` - Fetch transactions with filtering
+- `getRecentTransactions(limit)` - Get recent transactions
+- `getTransactionsByAccount(accountId, options)` - Get account-specific transactions
+- `getIncomeTransactions()` - Get only income (credit) transactions
+- `getExpenseTransactions()` - Get only expense (debit) transactions
 
-#### `getBalance(accountId: string): Promise<Balance>`
-Get the current balance for a specific account.
+#### Balances
+
+- `getBalances()` - Fetch all account balances
+- `getBalanceByAccount(accountId)` - Get balance for specific account
+- `getTotalBalance()` - Calculate total balance across all accounts
+- `getBalanceSummary()` - Get comprehensive balance summary
+
+### React Hooks
+
+- `useAuthorizationStatus()` - Manage authorization state
+- `useAccounts(options?)` - Fetch and monitor accounts
+- `useTransactions(options?)` - Fetch and monitor transactions
+- `useAccountBalance(accountId?)` - Track account balance
+- `useTotalBalance()` - Monitor total balance
+- `useTransactionStream(accountId?, interval?)` - Real-time transaction updates
+
+### Utilities
+
+#### Formatters
+
+- `formatCurrency(amount, currencyCode)` - Format currency values
+- `formatDate(date, format)` - Format dates
+- `formatRelativeDate(date)` - Format relative dates (e.g., "2 days ago")
+- `formatAccountName(account)` - Format account display name
+- `formatPercentage(value)` - Format percentages
+
+#### Analytics
+
+- `generateSpendingInsights(transactions, startDate, endDate)` - Generate comprehensive insights
+- `calculateTransactionStats(transactions)` - Calculate transaction statistics
+- `findUnusualTransactions(transactions)` - Detect unusual spending
+- `calculateSavingsRate(income, expenses)` - Calculate savings percentage
+- `predictFutureBalance(transactions, currentBalance, days)` - Predict future balance
 
 ### Types
 
 ```typescript
 interface Account {
   id: string;
-  displayName: string;
   institutionName: string;
-  type: 'asset' | 'liability' | 'unknown';
-  currency: string;
+  displayName: string;
+  accountDescription?: string;
+  currencyCode: string;
+  accountType: 'asset' | 'liability';
 }
 
 interface Transaction {
   id: string;
   accountId: string;
   amount: number;
-  currency: string;
-  date: number; // timestamp in milliseconds
-  description: string;
-  category?: TransactionCategory;
-  status: 'authorized' | 'booked' | 'pending' | 'rejected' | 'unknown';
-  type: 'credit' | 'debit' | 'unknown';
+  currencyCode: string;
+  transactionDate: number;
+  merchantName?: string;
+  transactionDescription: string;
+  merchantCategoryCode?: number;
+  status: TransactionStatus;
+  transactionType: TransactionType;
+  creditDebitIndicator: 'credit' | 'debit';
 }
 
-interface Balance {
+interface AccountBalance {
+  id: string;
   accountId: string;
-  available: number;
-  current: number;
-  currency: string;
-  asOfDate: number; // timestamp in milliseconds
+  amount: number;
+  currencyCode: string;
+}
+
+interface SpendingInsights {
+  periodStart: number;
+  periodEnd: number;
+  totalSpent: number;
+  totalIncome: number;
+  netCashFlow: number;
+  categoriesBreakdown: CategoryBreakdown[];
+  merchantsBreakdown: MerchantBreakdown[];
 }
 ```
 
@@ -128,6 +278,26 @@ interface Balance {
 - ❌ Android (returns "unavailable" for all methods)
 - ❌ Web (returns "unavailable" for all methods)
 
+## Examples
+
+Check out the [example app](./example) for a complete implementation showcasing all features including:
+
+- Authorization flow
+- Account listing and selection
+- Transaction history with grouping
+- Balance display
+- Spending statistics and insights
+- Unusual transaction detection
+- Pull-to-refresh functionality
+
+## Contributing
+
+Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) before submitting PRs.
+
 ## License
 
 MIT
+
+## Acknowledgments
+
+This module provides a comprehensive wrapper around Apple's FinanceKit API, making it easy to integrate financial data into your Expo/React Native applications.

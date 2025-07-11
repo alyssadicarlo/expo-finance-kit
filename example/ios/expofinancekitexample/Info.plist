@@ -44,6 +44,8 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSFinancialDataDescription</key>
+    <string>This app needs access to your financial data to display transaction history and account information.</string>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
     <key>UIRequiredDeviceCapabilities</key>
@@ -70,7 +72,5 @@
     <string>Light</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
-    <key>NSFinancialDataDescription</key>
-    <string>This app needs access to your financial data to display transaction history and account information.</string>
   </dict>
 </plist>

@@ -14,7 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "expo.modules.financekit.example"
+      "bundleIdentifier": "expo.modules.financekit.example",
+      "infoPlist": {
+        "NSFinancialDataDescription": "This app needs access to your financial data to display transaction history and account information."
+      },
+      "entitlements": {
+        "com.apple.developer.financekit": ["financial-data"],
+        "com.apple.developer.financekit.transaction-picker": true
+      }
     },
     "android": {
       "adaptiveIcon": {

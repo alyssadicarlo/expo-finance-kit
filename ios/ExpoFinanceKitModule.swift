@@ -2,142 +2,188 @@ import ExpoModulesCore
 import FinanceKit
 
 public class ExpoFinanceKitModule: Module {
-  private var financeStore: FinanceStore?
-  
   public func definition() -> ModuleDefinition {
     Name("ExpoFinanceKit")
 
     Constants([
-      "isAvailable": isFinanceKitAvailable()
+      "isAvailable": self.isFinanceKitAvailable()
     ])
 
     Events("onAuthorizationStatusChanged")
 
-    OnCreate {
-      if #available(iOS 17.4, *) {
-        self.financeStore = FinanceStore()
-      }
-    }
-    
     AsyncFunction("requestAuthorization") { () -> Bool in
-      guard #available(iOS 17.4, *),
-            let store = self.financeStore else {
+      guard #available(iOS 17.4, *) else {
         throw FinanceKitError.unavailable
       }
-      
-      return try await store.requestAuthorization()
+
+      let status = try await FinanceStore.shared.requestAuthorization()
+      return status == .authorized
     }
-    
-    AsyncFunction("getAuthorizationStatus") { () -> String in
-      guard #available(iOS 17.4, *),
-            let store = self.financeStore else {
+
+    AsyncFunction("getAuthorizationStatus") { () async throws -> String in
+      guard #available(iOS 17.4, *) else {
         return "unavailable"
       }
-      
-      let status = store.authorizationStatus
-      return authorizationStatusToString(status)
+
+      let status = try await FinanceStore.shared.authorizationStatus()
+      return convertAuthorizationStatusToString(status)
     }
-    
+
     AsyncFunction("getAccounts") { () -> [[String: Any?]] in
-      guard #available(iOS 17.4, *),
-            let store = self.financeStore else {
+      guard #available(iOS 17.4, *) else {
         throw FinanceKitError.unavailable
       }
-      
-      guard store.authorizationStatus == .authorized else {
+
+      let authStatus = try await FinanceStore.shared.authorizationStatus()
+      guard authStatus == .authorized else {
         throw FinanceKitError.unauthorized
       }
-      
-      let accounts = try await store.accounts()
+
+      let query = AccountQuery()
+      let accounts = try await FinanceStore.shared.accounts(query: query)
       return accounts.map { account in
+        var accountType: String = "unknown"
+        if account.assetAccount != nil {
+          accountType = "asset"
+        } else if account.liabilityAccount != nil {
+          accountType = "liability"
+        }
+
         return [
           "id": account.id.uuidString,
           "displayName": account.displayName,
           "institutionName": account.institutionName,
-          "type": accountTypeToString(account.type),
-          "currency": account.currencyCode
+          "accountDescription": account.accountDescription,
+          "currencyCode": account.currencyCode,
+          "accountType": accountType
         ]
       }
     }
-    
-    AsyncFunction("getTransactions") { (accountId: String?, startDate: Double?, endDate: Double?) -> [[String: Any?]] in
-      guard #available(iOS 17.4, *),
-            let store = self.financeStore else {
+
+    AsyncFunction("getTransactions") {
+      (accountId: String?, startDate: Double?, endDate: Double?) -> [[String: Any?]] in
+      guard #available(iOS 17.4, *) else {
         throw FinanceKitError.unavailable
       }
-      
-      guard store.authorizationStatus == .authorized else {
+
+      let authStatus = try await FinanceStore.shared.authorizationStatus()
+      guard authStatus == .authorized else {
         throw FinanceKitError.unauthorized
       }
-      
-      var query = TransactionQuery()
-      
+
+      // Build predicate
+      let startDate = startDate != nil ? Date(timeIntervalSince1970: startDate! / 1000) : nil
+      let endDate = endDate != nil ? Date(timeIntervalSince1970: endDate! / 1000) : nil
+
+      var predicate: Predicate<Transaction>?
+
       if let accountIdString = accountId,
-         let uuid = UUID(uuidString: accountIdString) {
-        query.accountIdentifiers = [uuid]
+        let uuid = UUID(uuidString: accountIdString)
+      {
+        if let start = startDate, let end = endDate {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.accountID == uuid && transaction.transactionDate >= start
+              && transaction.transactionDate <= end
+          }
+        } else if let start = startDate {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.accountID == uuid && transaction.transactionDate >= start
+          }
+        } else if let end = endDate {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.accountID == uuid && transaction.transactionDate <= end
+          }
+        } else {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.accountID == uuid
+          }
+        }
+      } else {
+        if let start = startDate, let end = endDate {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.transactionDate >= start && transaction.transactionDate <= end
+          }
+        } else if let start = startDate {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.transactionDate >= start
+          }
+        } else if let end = endDate {
+          predicate = #Predicate<Transaction> { transaction in
+            transaction.transactionDate <= end
+          }
+        }
       }
-      
-      if let start = startDate {
-        query.dateInterval.start = Date(timeIntervalSince1970: start / 1000)
-      }
-      
-      if let end = endDate {
-        query.dateInterval.end = Date(timeIntervalSince1970: end / 1000)
-      }
-      
-      let transactions = try await store.transactions(query: query)
+
+      // Create query with predicate
+      let query = TransactionQuery(
+        sortDescriptors: [SortDescriptor(\Transaction.transactionDate, order: .reverse)],
+        predicate: predicate,
+        limit: nil,
+        offset: nil
+      )
+
+      let transactions = try await FinanceStore.shared.transactions(query: query)
       return transactions.map { transaction in
         return [
           "id": transaction.id.uuidString,
-          "accountId": transaction.accountIdentifier.uuidString,
-          "amount": transaction.amount,
-          "currency": transaction.currencyCode,
-          "date": transaction.transactionDate.timeIntervalSince1970 * 1000,
-          "description": transaction.merchantName ?? transaction.transactionDescription,
-          "category": transactionCategoryToString(transaction.category),
-          "status": transactionStatusToString(transaction.status),
-          "type": transactionTypeToString(transaction.transactionType)
+          "accountId": transaction.accountID.uuidString,
+          "amount": transaction.transactionAmount.amount,
+          "currencyCode": transaction.transactionAmount.currencyCode,
+          "transactionDate": transaction.transactionDate.timeIntervalSince1970 * 1000,
+          "merchantName": transaction.merchantName,
+          "transactionDescription": transaction.transactionDescription,
+          "merchantCategoryCode": transaction.merchantCategoryCode?.rawValue,
+          "status": convertTransactionStatusToString(transaction.status),
+          "transactionType": convertTransactionTypeToString(transaction.transactionType),
+          "creditDebitIndicator": transaction.creditDebitIndicator.rawValue,
         ]
       }
     }
-    
-    AsyncFunction("getBalance") { (accountId: String) -> [String: Any?] in
-      guard #available(iOS 17.4, *),
-            let store = self.financeStore else {
+
+    AsyncFunction("getBalance") { () -> [[String: Any?]] in
+      guard #available(iOS 17.4, *) else {
         throw FinanceKitError.unavailable
       }
-      
-      guard store.authorizationStatus == .authorized else {
+
+      let authStatus = try await FinanceStore.shared.authorizationStatus()
+      guard authStatus == .authorized else {
         throw FinanceKitError.unauthorized
       }
-      
-      guard let uuid = UUID(uuidString: accountId) else {
-        throw FinanceKitError.invalidAccountId
+
+      let query = AccountBalanceQuery()
+
+      let balances = try await FinanceStore.shared.accountBalances(query: query)
+
+      return balances.map { balance in
+        var amount: Decimal = 0.0
+        
+        switch balance.currentBalance {
+        case .available(let availableBalance):
+          amount = availableBalance.amount.amount
+        case .booked(let bookedBalance):
+          amount = bookedBalance.amount.amount
+        case .availableAndBooked(let availableBalance, _):
+          amount = availableBalance.amount.amount
+        }
+        
+        return [
+          "id": balance.id.uuidString,
+          "amount": NSDecimalNumber(decimal: amount).doubleValue,
+          "currencyCode": balance.currencyCode,
+          "accountId": balance.accountID.uuidString,
+        ]
       }
-      
-      let balances = try await store.accountBalances(accountIdentifiers: [uuid])
-      guard let balance = balances.first else {
-        throw FinanceKitError.accountNotFound
-      }
-      
-      return [
-        "accountId": balance.accountIdentifier.uuidString,
-        "available": balance.available,
-        "current": balance.current,
-        "currency": balance.currencyCode,
-        "asOfDate": balance.asOfDate.timeIntervalSince1970 * 1000
-      ]
     }
   }
-  
+
   private func isFinanceKitAvailable() -> Bool {
     if #available(iOS 17.4, *) {
       return FinanceStore.isDataAvailable(.financialData)
     }
     return false
   }
-  
-  private func authorizationStatusToString(_ status: FinanceStore.AuthorizationStatus) -> String {
+
+  private func convertAuthorizationStatusToString(_ status: AuthorizationStatus) -> String {
     switch status {
     case .notDetermined:
       return "notDetermined"
@@ -149,68 +195,8 @@ public class ExpoFinanceKitModule: Module {
       return "unknown"
     }
   }
-  
-  private func accountTypeToString(_ type: Account.AccountType) -> String {
-    switch type {
-    case .asset:
-      return "asset"
-    case .liability:
-      return "liability"
-    @unknown default:
-      return "unknown"
-    }
-  }
-  
-  private func transactionCategoryToString(_ category: Transaction.Category?) -> String? {
-    guard let category = category else { return nil }
-    
-    switch category {
-    case .automotive:
-      return "automotive"
-    case .billsAndUtilities:
-      return "billsAndUtilities"
-    case .cashAndChecks:
-      return "cashAndChecks"
-    case .dining:
-      return "dining"
-    case .education:
-      return "education"
-    case .entertainment:
-      return "entertainment"
-    case .feesAndAdjustments:
-      return "feesAndAdjustments"
-    case .financialServices:
-      return "financialServices"
-    case .food:
-      return "food"
-    case .gifts:
-      return "gifts"
-    case .groceries:
-      return "groceries"
-    case .health:
-      return "health"
-    case .home:
-      return "home"
-    case .income:
-      return "income"
-    case .other:
-      return "other"
-    case .personalCare:
-      return "personalCare"
-    case .shopping:
-      return "shopping"
-    case .transfer:
-      return "transfer"
-    case .transportation:
-      return "transportation"
-    case .travel:
-      return "travel"
-    @unknown default:
-      return "unknown"
-    }
-  }
-  
-  private func transactionStatusToString(_ status: Transaction.Status) -> String {
+
+  private func convertTransactionStatusToString(_ status: TransactionStatus) -> String {
     switch status {
     case .authorized:
       return "authorized"
@@ -224,13 +210,43 @@ public class ExpoFinanceKitModule: Module {
       return "unknown"
     }
   }
-  
-  private func transactionTypeToString(_ type: Transaction.TransactionType) -> String {
+
+  private func convertTransactionTypeToString(_ type: TransactionType) -> String {
     switch type {
-    case .credit:
-      return "credit"
-    case .debit:
-      return "debit"
+    case .adjustment:
+      return "adjustment"
+    case .atm:
+      return "atm"
+    case .billPayment:
+      return "billPayment"
+    case .check:
+      return "check"
+    case .deposit:
+      return "deposit"
+    case .directDebit:
+      return "directDebit"
+    case .directDeposit:
+      return "directDeposit"
+    case .dividend:
+      return "dividend"
+    case .fee:
+      return "fee"
+    case .interest:
+      return "interest"
+    case .loan:
+      return "loan"
+    case .pointOfSale:
+      return "pointOfSale"
+    case .refund:
+      return "refund"
+    case .standingOrder:
+      return "standingOrder"
+    case .transfer:
+      return "transfer"
+    case .unknown:
+      return "unknown"
+    case .withdrawal:
+      return "withdrawal"
     @unknown default:
       return "unknown"
     }

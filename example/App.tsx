@@ -1,108 +1,153 @@
-import { useState, useEffect } from 'react';
-import { Button, StyleSheet, Text, View, ScrollView, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  Button,
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  SafeAreaView,
+  TouchableOpacity,
+  SectionList,
+  RefreshControl,
+} from 'react-native';
 
-import ExpoFinanceKit, { 
-  Account, 
-  Transaction, 
-  Balance,
-  AuthorizationStatus 
+import {
+  // Hooks
+  useAuthorizationStatus,
+  useAccounts,
+  useRecentTransactions,
+  useAccountBalance,
+  useTotalBalance,
+  
+  // Types
+  Account,
+  Transaction,
+  AccountBalance,
+  SpendingInsights,
+  
+  // Functions
+  isFinanceKitAvailable,
+  generateSpendingInsights,
+  calculateTransactionStats,
+  groupTransactionsByDate,
+  
+  // Formatters
+  formatCurrency,
+  formatDate,
+  formatRelativeDate,
+  formatAccountName,
+  formatMerchantCategory,
+  formatBalanceChange,
+  
+  // Analytics
+  findUnusualTransactions,
+  calculateSavingsRate,
 } from 'expo-finance-kit';
-import React from 'react';
 
 export default function App() {
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [authStatus, setAuthStatus] = useState<AuthorizationStatus>('notDetermined');
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isAvailable] = useState(isFinanceKitAvailable());
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [balance, setBalance] = useState<Balance | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [insights, setInsights] = useState<SpendingInsights | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    // Safely check if module is available first
-    const moduleAvailable = ExpoFinanceKit?.isAvailable ?? false;
-    setIsAvailable(moduleAvailable);
-    if (moduleAvailable) {
-      checkAuthStatus();
-    }
-  }, []);
+  // Use the custom hooks
+  const { status: authStatus, requestAuthorization, isAuthorized, loading: authLoading } = useAuthorizationStatus();
+  const { accounts, loading: accountsLoading, refetch: refetchAccounts } = useAccounts();
+  const { transactions, loading: transactionsLoading, refetch: refetchTransactions } = useRecentTransactions(100);
+  const { balance: selectedBalance, refetch: refetchBalance } = useAccountBalance(selectedAccountId || undefined);
+  const { totalBalance, refetch: refetchTotalBalance } = useTotalBalance();
 
-  const checkAuthStatus = async () => {
-    try {
-      const status = await ExpoFinanceKit.getAuthorizationStatus();
-      setAuthStatus(status);
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-    }
+  // Filter transactions for selected account
+  const accountTransactions = selectedAccountId
+    ? transactions.filter(t => t.accountId === selectedAccountId)
+    : transactions;
+
+  // Group transactions by date
+  const groupedTransactions = React.useMemo(() => {
+    const grouped = groupTransactionsByDate(accountTransactions);
+    return Array.from(grouped.entries()).map(([date, items]) => ({
+      title: date,
+      data: items,
+    }));
+  }, [accountTransactions]);
+
+  // Calculate statistics
+  const stats = React.useMemo(() => {
+    return calculateTransactionStats(accountTransactions);
+  }, [accountTransactions]);
+
+  // Find unusual transactions
+  const unusualTransactions = React.useMemo(() => {
+    return findUnusualTransactions(accountTransactions);
+  }, [accountTransactions]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refetchAccounts(),
+      refetchTransactions(),
+      refetchBalance(),
+      refetchTotalBalance(),
+    ]);
+    setRefreshing(false);
   };
 
-  const requestAuthorization = async () => {
+  const handleRequestAuth = async () => {
     try {
-      setLoading(true);
-      const granted = await ExpoFinanceKit.requestAuthorization();
-      if (granted) {
-        await checkAuthStatus();
+      const result = await requestAuthorization();
+      if (result.granted) {
         Alert.alert('Success', 'Authorization granted!');
+        handleRefresh();
       } else {
         Alert.alert('Denied', 'Authorization was denied');
       }
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setLoading(false);
     }
   };
 
-  const loadAccounts = async () => {
-    try {
-      setLoading(true);
-      const accountList = await ExpoFinanceKit.getAccounts();
-      setAccounts(accountList);
-      if (accountList.length > 0 && !selectedAccountId) {
-        setSelectedAccountId(accountList[0].id);
-      }
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
+  const generateInsights = () => {
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentTransactions = accountTransactions.filter(
+      t => t.transactionDate >= thirtyDaysAgo.getTime()
+    );
+    
+    const newInsights = generateSpendingInsights(recentTransactions, thirtyDaysAgo, now);
+    setInsights(newInsights);
+    setShowInsights(true);
   };
 
-  const loadTransactions = async () => {
-    try {
-      setLoading(true);
-      const now = Date.now();
-      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-      
-      const transactionList = await ExpoFinanceKit.getTransactions(
-        selectedAccountId || undefined,
-        thirtyDaysAgo,
-        now
-      );
-      setTransactions(transactionList);
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadBalance = async () => {
-    if (!selectedAccountId) {
-      Alert.alert('Error', 'Please select an account first');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const accountBalance = await ExpoFinanceKit.getBalance(selectedAccountId);
-      setBalance(accountBalance);
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const renderTransaction = ({ item }: { item: Transaction }) => (
+    <TouchableOpacity style={styles.transactionItem}>
+      <View style={styles.transactionHeader}>
+        <Text style={styles.transactionDescription} numberOfLines={1}>
+          {item.merchantName || item.transactionDescription}
+        </Text>
+        <Text style={[
+          styles.transactionAmount,
+          item.creditDebitIndicator === 'credit' ? styles.creditAmount : styles.debitAmount
+        ]}>
+          {item.creditDebitIndicator === 'credit' ? '+' : '-'}
+          {formatCurrency(item.amount, item.currencyCode)}
+        </Text>
+      </View>
+      <View style={styles.transactionDetails}>
+        <Text style={styles.transactionDate}>{formatRelativeDate(item.transactionDate)}</Text>
+        {item.merchantCategoryCode && (
+          <Text style={styles.transactionCategory}>
+            {formatMerchantCategory(item.merchantCategoryCode)}
+          </Text>
+        )}
+        <Text style={styles.transactionStatus}>{item.status}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   if (!isAvailable) {
     return (
@@ -117,86 +162,180 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.title}>FinanceKit Example</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        <Text style={styles.title}>Expo Finance Kit Demo</Text>
         
+        {/* Authorization Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Authorization Status</Text>
-          <Text style={styles.status}>{authStatus}</Text>
+          <Text style={styles.sectionTitle}>Authorization</Text>
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusLabel}>Status:</Text>
+            <Text style={[styles.status, { color: isAuthorized ? '#4CAF50' : '#FF9800' }]}>
+              {authStatus}
+            </Text>
+          </View>
           
           {authStatus === 'notDetermined' && (
             <Button 
               title="Request Authorization" 
-              onPress={requestAuthorization}
-              disabled={loading}
+              onPress={handleRequestAuth}
+              disabled={authLoading}
             />
           )}
         </View>
 
-        {authStatus === 'authorized' && (
+        {isAuthorized && (
           <>
+            {/* Total Balance Section */}
+            {totalBalance && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Total Balance</Text>
+                <Text style={styles.totalBalance}>
+                  {formatCurrency(totalBalance.total, 'USD')}
+                </Text>
+                <Text style={styles.accountCount}>
+                  Across {totalBalance.accounts.length} accounts
+                </Text>
+              </View>
+            )}
+
+            {/* Accounts Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Accounts</Text>
-              <Button 
-                title="Load Accounts" 
-                onPress={loadAccounts}
-                disabled={loading}
-              />
-              {accounts.map((account) => (
-                <View key={account.id} style={styles.accountItem}>
-                  <Text style={styles.accountName}>{account.displayName}</Text>
-                  <Text>{account.institutionName}</Text>
-                  <Text>Type: {account.type}</Text>
-                  <Button
-                    title="Select"
+              <Text style={styles.sectionTitle}>Accounts ({accounts.length})</Text>
+              {accountsLoading ? (
+                <ActivityIndicator />
+              ) : (
+                accounts.map((account) => (
+                  <TouchableOpacity
+                    key={account.id}
+                    style={[
+                      styles.accountItem,
+                      selectedAccountId === account.id && styles.selectedAccount
+                    ]}
                     onPress={() => setSelectedAccountId(account.id)}
-                    disabled={selectedAccountId === account.id}
-                  />
-                </View>
-              ))}
+                  >
+                    <Text style={styles.accountName}>{formatAccountName(account)}</Text>
+                    <Text style={styles.accountInstitution}>{account.institutionName}</Text>
+                    <View style={styles.accountDetails}>
+                      <Text style={styles.accountType}>{account.accountType}</Text>
+                      <Text style={styles.accountCurrency}>{account.currencyCode}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
 
-            {selectedAccountId && (
-              <>
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Balance</Text>
-                  <Button 
-                    title="Load Balance" 
-                    onPress={loadBalance}
-                    disabled={loading}
-                  />
-                  {balance && (
-                    <View style={styles.balanceItem}>
-                      <Text>Available: {balance.currency} {balance.available.toFixed(2)}</Text>
-                      <Text>Current: {balance.currency} {balance.current.toFixed(2)}</Text>
-                      <Text>As of: {new Date(balance.asOfDate).toLocaleDateString()}</Text>
-                    </View>
-                  )}
-                </View>
+            {/* Selected Account Balance */}
+            {selectedAccountId && selectedBalance && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Account Balance</Text>
+                <Text style={styles.balance}>
+                  {formatCurrency(selectedBalance.amount, selectedBalance.currencyCode)}
+                </Text>
+              </View>
+            )}
 
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Transactions (Last 30 days)</Text>
-                  <Button 
-                    title="Load Transactions" 
-                    onPress={loadTransactions}
-                    disabled={loading}
-                  />
-                  {transactions.map((transaction) => (
-                    <View key={transaction.id} style={styles.transactionItem}>
-                      <Text style={styles.transactionDescription}>{transaction.description}</Text>
-                      <Text>{transaction.type}: {transaction.currency} {Math.abs(transaction.amount).toFixed(2)}</Text>
-                      <Text>Date: {new Date(transaction.date).toLocaleDateString()}</Text>
-                      <Text>Status: {transaction.status}</Text>
-                      {transaction.category && <Text>Category: {transaction.category}</Text>}
+            {/* Transaction Statistics */}
+            {accountTransactions.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Transaction Statistics</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Total Income</Text>
+                    <Text style={styles.statValue}>
+                      {formatCurrency(stats.totalIncome, 'USD')}
+                    </Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Total Expenses</Text>
+                    <Text style={styles.statValue}>
+                      {formatCurrency(stats.totalExpenses, 'USD')}
+                    </Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Avg Transaction</Text>
+                    <Text style={styles.statValue}>
+                      {formatCurrency(stats.averageTransaction, 'USD')}
+                    </Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Savings Rate</Text>
+                    <Text style={styles.statValue}>
+                      {calculateSavingsRate(stats.totalIncome, stats.totalExpenses).toFixed(1)}%
+                    </Text>
+                  </View>
+                </View>
+                <Button title="View Spending Insights" onPress={generateInsights} />
+              </View>
+            )}
+
+            {/* Unusual Transactions */}
+            {unusualTransactions.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>
+                  Unusual Transactions ({unusualTransactions.length})
+                </Text>
+                {unusualTransactions.slice(0, 3).map((transaction) => (
+                  <View key={transaction.id} style={styles.unusualTransaction}>
+                    <Text>{transaction.merchantName || transaction.transactionDescription}</Text>
+                    <Text style={styles.unusualAmount}>
+                      {formatCurrency(transaction.amount, transaction.currencyCode)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Recent Transactions */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                Recent Transactions ({accountTransactions.length})
+              </Text>
+              {transactionsLoading ? (
+                <ActivityIndicator />
+              ) : groupedTransactions.length > 0 ? (
+                <SectionList
+                  sections={groupedTransactions.slice(0, 5)}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderTransaction}
+                  renderSectionHeader={({ section }) => (
+                    <Text style={styles.sectionHeader}>{section.title}</Text>
+                  )}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <Text style={styles.emptyText}>No transactions found</Text>
+              )}
+            </View>
+
+            {/* Spending Insights Modal */}
+            {showInsights && insights && (
+              <View style={styles.insightsModal}>
+                <View style={styles.insightsContent}>
+                  <Text style={styles.insightsTitle}>Spending Insights</Text>
+                  <Text>Total Spent: {formatCurrency(insights.totalSpent, 'USD')}</Text>
+                  <Text>Total Income: {formatCurrency(insights.totalIncome, 'USD')}</Text>
+                  <Text>Net Cash Flow: {formatCurrency(insights.netCashFlow, 'USD')}</Text>
+                  
+                  <Text style={styles.insightsSubtitle}>Top Categories</Text>
+                  {insights.categoriesBreakdown.slice(0, 5).map((category, index) => (
+                    <View key={index} style={styles.categoryItem}>
+                      <Text>{category.category}</Text>
+                      <Text>{formatCurrency(category.amount, 'USD')} ({category.percentage.toFixed(1)}%)</Text>
                     </View>
                   ))}
+                  
+                  <Button title="Close" onPress={() => setShowInsights(false)} />
                 </View>
-              </>
+              </View>
             )}
           </>
         )}
-
-        {loading && <ActivityIndicator style={styles.loader} />}
       </ScrollView>
     </SafeAreaView>
   );
@@ -218,10 +357,11 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
@@ -232,7 +372,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     padding: 15,
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -240,42 +380,205 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
+    marginBottom: 15,
+    color: '#333',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 10,
+  },
+  statusLabel: {
+    fontSize: 16,
+    marginRight: 10,
   },
   status: {
     fontSize: 16,
-    color: '#007AFF',
-    marginBottom: 10,
+    fontWeight: '500',
+  },
+  totalBalance: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 5,
+  },
+  accountCount: {
+    fontSize: 14,
+    color: '#666',
   },
   accountItem: {
-    marginVertical: 10,
-    padding: 10,
+    marginVertical: 5,
+    padding: 15,
     backgroundColor: '#f8f8f8',
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedAccount: {
+    borderColor: '#007AFF',
+    backgroundColor: '#e8f2ff',
   },
   accountName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#333',
   },
-  balanceItem: {
-    marginTop: 10,
+  accountInstitution: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  accountDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  accountType: {
+    fontSize: 12,
+    color: '#999',
+    textTransform: 'capitalize',
+  },
+  accountCurrency: {
+    fontSize: 12,
+    color: '#999',
+  },
+  balance: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 15,
+  },
+  statItem: {
+    width: '50%',
     padding: 10,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
   },
   transactionItem: {
-    marginVertical: 5,
-    padding: 10,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  transactionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   transactionDescription: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#333',
+    flex: 1,
+    marginRight: 10,
   },
-  loader: {
-    marginTop: 20,
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  creditAmount: {
+    color: '#4CAF50',
+  },
+  debitAmount: {
+    color: '#333',
+  },
+  transactionDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 10,
+  },
+  transactionCategory: {
+    fontSize: 12,
+    color: '#666',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  transactionStatus: {
+    fontSize: 12,
+    color: '#999',
+    textTransform: 'capitalize',
+  },
+  sectionHeader: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 6,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  unusualTransaction: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  unusualAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF6347',
+  },
+  insightsModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  insightsContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxHeight: '80%',
+  },
+  insightsTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 15,
+  },
+  insightsSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
   },
 });
