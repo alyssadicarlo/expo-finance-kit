@@ -43,11 +43,11 @@ export async function getTransactions(
       : undefined;
 
     // Fetch transactions from native module
-    const transactions = await ExpoFinanceKit.getTransactions({
-      accountId: options.accountId,
+    const transactions = await ExpoFinanceKit.getTransactions(
+      options.accountId || undefined,
       startDate,
-      endDate,
-    });
+      endDate
+    );
 
     // Transform and apply additional filters
     let filteredTransactions = transactions.map(transformTransaction);

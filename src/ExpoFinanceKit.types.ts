@@ -10,6 +10,7 @@
  */
 export type ExpoFinanceKitModuleEvents = {
   onAuthorizationStatusChanged: (params: AuthorizationStatusChangedPayload) => void;
+  onFinanceDataChanged: (params: FinanceDataChangedPayload) => void;
 };
 
 /**
@@ -18,6 +19,14 @@ export type ExpoFinanceKitModuleEvents = {
 export type AuthorizationStatusChangedPayload = {
   status: AuthorizationStatus;
   timestamp: number;
+};
+
+/**
+ * Payload for finance data change events from background extension
+ */
+export type FinanceDataChangedPayload = {
+  timestamp: number;
+  source: 'background_extension';
 };
 
 // ==================== Authorization ====================
@@ -328,6 +337,32 @@ export interface FinanceKitError extends Error {
   details?: Record<string, any>;
 }
 
+// ==================== Background Sync ====================
+
+/**
+ * Information about the last background sync
+ */
+export interface LastSyncInfo {
+  last_sync_accounts?: SyncTimestamp;
+  last_sync_transactions?: TransactionSyncInfo;
+  last_sync_balances?: SyncTimestamp;
+}
+
+/**
+ * Sync timestamp information
+ */
+export interface SyncTimestamp {
+  timestamp: string;
+}
+
+/**
+ * Transaction sync information
+ */
+export interface TransactionSyncInfo {
+  lastSyncDate: string;
+  changeType: string;
+}
+
 // ==================== Module Interface ====================
 
 /**
@@ -345,6 +380,9 @@ export interface ExpoFinanceKitModule {
   getAccounts(options?: AccountQueryOptions): Promise<Account[]>;
   getTransactions(options?: TransactionQueryOptions): Promise<Transaction[]>;
   getBalance(options?: BalanceQueryOptions): Promise<AccountBalance[]>;
+  
+  // Background sync
+  getLastSyncInfo(): Promise<LastSyncInfo>;
   
   // Event handling
   addListener(eventName: keyof ExpoFinanceKitModuleEvents, listener: Function): void;

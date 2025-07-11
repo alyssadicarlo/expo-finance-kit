@@ -34,7 +34,7 @@ export async function getBalances(
   }
 
   try {
-    const balances = await ExpoFinanceKit.getBalance({});
+    const balances = await ExpoFinanceKit.getBalance();
     let filteredBalances = balances.map(transformBalance);
 
     // Apply filters
@@ -67,8 +67,33 @@ export async function getBalanceByAccount(accountId: string): Promise<AccountBal
     );
   }
 
-  const balances = await getBalances({ accountIds: [accountId] });
-  return balances.length > 0 ? balances[0] : null;
+  const isAuthorized = await ensureAuthorized();
+  if (!isAuthorized) {
+    throw createFinanceKitError(
+      FinanceKitErrorCode.Unauthorized,
+      'User has not authorized access to financial data'
+    );
+  }
+
+  try {
+    // Use the new native method that gets balance for specific account
+    const balance = await ExpoFinanceKit.getBalanceForAccount(accountId);
+    return balance ? transformBalance(balance) : null;
+  } catch (error) {
+    // If the new method is not available, fall back to filtering
+    if (error && typeof error === 'object' && 'message' in error && 
+        typeof (error as any).message === 'string' &&
+        (error as any).message.includes('getBalanceForAccount')) {
+      const balances = await getBalances();
+      const filtered = balances.filter(b => b.accountId === accountId);
+      return filtered.length > 0 ? filtered[0] : null;
+    }
+    throw createFinanceKitError(
+      FinanceKitErrorCode.Unknown,
+      'Failed to fetch balance for account',
+      { originalError: error }
+    );
+  }
 }
 
 /**
@@ -80,23 +105,55 @@ export async function getTotalBalance(): Promise<{
   byCurrency: Map<string, number>;
   accounts: AccountBalance[];
 }> {
-  const balances = await getBalances();
-  const byCurrency = new Map<string, number>();
-  let totalInUSD = 0; // Would need exchange rates for accurate conversion
+  const isAuthorized = await ensureAuthorized();
+  if (!isAuthorized) {
+    throw createFinanceKitError(
+      FinanceKitErrorCode.Unauthorized,
+      'User has not authorized access to financial data'
+    );
+  }
 
-  balances.forEach(balance => {
-    const current = byCurrency.get(balance.currencyCode) || 0;
-    byCurrency.set(balance.currencyCode, current + balance.amount);
+  try {
+    // First get all accounts
+    const accounts = await ExpoFinanceKit.getAccounts();
     
-    // For now, just sum all amounts (would need currency conversion)
-    totalInUSD += balance.amount;
-  });
+    // Get current balance for each account
+    const balancePromises = accounts.map(async (account: any) => {
+      try {
+        const balance = await ExpoFinanceKit.getBalanceForAccount(account.id);
+        return balance ? transformBalance(balance) : null;
+      } catch (error) {
+        console.warn(`Failed to get balance for account ${account.id}:`, error);
+        return null;
+      }
+    });
+    
+    const balanceResults = await Promise.all(balancePromises);
+    const validBalances = balanceResults.filter((b): b is AccountBalance => b !== null);
+    
+    const byCurrency = new Map<string, number>();
+    let totalInUSD = 0; // Would need exchange rates for accurate conversion
 
-  return {
-    total: totalInUSD,
-    byCurrency,
-    accounts: balances,
-  };
+    validBalances.forEach(balance => {
+      const current = byCurrency.get(balance.currencyCode) || 0;
+      byCurrency.set(balance.currencyCode, current + balance.amount);
+      
+      // For now, just sum all amounts (would need currency conversion)
+      totalInUSD += balance.amount;
+    });
+
+    return {
+      total: totalInUSD,
+      byCurrency,
+      accounts: validBalances,
+    };
+  } catch (error) {
+    throw createFinanceKitError(
+      FinanceKitErrorCode.Unknown,
+      'Failed to fetch total balance',
+      { originalError: error }
+    );
+  }
 }
 
 /**

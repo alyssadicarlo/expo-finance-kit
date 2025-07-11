@@ -56,6 +56,16 @@ export {
   getBalanceHistory,
 } from './modules/balances';
 
+// Background sync
+export {
+  getLastSyncInfo,
+  backgroundDataListener,
+  setupAutoRefresh,
+  isBackgroundSyncAvailable,
+  getTimeSinceLastSync,
+  needsRefresh,
+} from './modules/backgroundSync';
+
 // Utilities
 export {
   // Validators
@@ -115,16 +125,9 @@ export {
   useAccountBalance,
   useTotalBalance,
   useTransactionStream,
+  useBackgroundSync,
 } from './hooks/useFinanceKit';
 
-// Cache utilities
-export {
-  MemoryCache,
-  accountCache,
-  transactionCache,
-  balanceCache,
-  clearAllCaches,
-} from './utils/cache';
 
 // Legacy exports for backward compatibility
 export { requestAuthorizationWithStatus } from './helpers';
@@ -134,9 +137,9 @@ export * as Accounts from './modules/accounts';
 export * as Transactions from './modules/transactions';
 export * as Balances from './modules/balances';
 export * as Authorization from './modules/authorization';
+export * as BackgroundSync from './modules/backgroundSync';
 export * as Formatters from './utils/formatters';
 export * as Analytics from './utils/analytics';
 export * as Validators from './utils/validators';
 export * as Errors from './utils/errors';
-export * as Cache from './utils/cache';
 export * as Hooks from './hooks/useFinanceKit';

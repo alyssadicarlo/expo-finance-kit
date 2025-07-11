@@ -1,6 +1,6 @@
 {
   "name": "expo-finance-kit",
-  "version": "0.1.36",
+  "version": "0.2.5",
   "description": "Native Expo module for Apple FinanceKit - Access financial data from Apple Card and other accounts",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -11,9 +11,10 @@
     "test": "expo-module test",
     "prepare": "expo-module prepare",
     "prepublishOnly": "expo-module prepublishOnly",
-    "expo-module": "expo-module",
-    "open:ios": "xed example/ios",
-    "open:android": "open -a \"Android Studio\" example/android"
+    "open:ios": "open -a \"Xcode\" example/ios",
+    "open:android": "open -a \"Android Studio\" example/android",
+    "plugin:build": "expo-module build plugin",
+    "plugin:test": "expo-module test plugin"
   },
   "keywords": [
     "react-native",
@@ -33,11 +34,14 @@
   "author": "Alyssa DiCarlo <alyssa.dicarlo@gmail.com> (https://github.com/alyssadicarlo)",
   "license": "MIT",
   "homepage": "https://github.com/alyssadicarlo/expo-finance-kit#readme",
-  "dependencies": {},
   "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/plist": "^3.0.5",
     "@types/react": "~19.0.0",
-    "expo-module-scripts": "^4.1.6",
     "expo": "~53.0.0",
+    "expo-module-scripts": "^4.1.6",
+    "fs-extra": "^11.3.0",
+    "path": "^0.12.7",
     "react-native": "0.79.1"
   },
   "peerDependencies": {
