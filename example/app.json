@@ -16,17 +16,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "expo.modules.financekit.example"
     },
-    "plugins": [
-      [
-        "../",
-        {
-          "usageDescription": "This app needs access to your financial data to display transaction history, account information, and provide real-time updates.",
-          "appGroupIdentifier": "group.expo.modules.financekit.example",
-          "enableBackgroundDelivery": true,
-          "backgroundModes": ["remote-notification", "processing"]
-        }
-      ]
-    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
