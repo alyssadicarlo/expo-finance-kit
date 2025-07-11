@@ -2,7 +2,6 @@ import ExpoModulesCore
 import FinanceKit
 
 public class ExpoFinanceKitModule: Module {
-  private var notificationObserver: NSObjectProtocol?
   
   public func definition() -> ModuleDefinition {
     Name("ExpoFinanceKit")
@@ -11,15 +10,7 @@ public class ExpoFinanceKitModule: Module {
       "isAvailable": self.isFinanceKitAvailable()
     ])
 
-    Events("onAuthorizationStatusChanged", "onFinanceDataChanged")
-    
-    OnCreate {
-      self.setupBackgroundNotificationObserver()
-    }
-    
-    OnDestroy {
-      self.removeBackgroundNotificationObserver()
-    }
+    Events("onAuthorizationStatusChanged")
 
     AsyncFunction("requestAuthorization") { () -> Bool in
       guard #available(iOS 17.4, *) else {
@@ -37,33 +28,6 @@ public class ExpoFinanceKitModule: Module {
 
       let status = try await FinanceStore.shared.authorizationStatus()
       return convertAuthorizationStatusToString(status)
-    }
-    
-    AsyncFunction("getLastSyncInfo") { () -> [String: Any?] in
-      // Get app group identifier from bundle
-      let bundleId = Bundle.main.bundleIdentifier ?? "com.expo.financekit"
-      let appGroupId = "group.\(bundleId)"
-      
-      guard let appGroupURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: appGroupId
-      ) else {
-        return [:]
-      }
-      
-      var syncInfo: [String: Any?] = [:]
-      
-      let syncKeys = ["last_sync_accounts", "last_sync_transactions", "last_sync_balances"]
-      
-      for key in syncKeys {
-        let fileURL = appGroupURL.appendingPathComponent("\(key).json")
-        
-        if let data = try? Data(contentsOf: fileURL),
-           let json = try? JSONSerialization.jsonObject(with: data) {
-          syncInfo[key] = json
-        }
-      }
-      
-      return syncInfo
     }
 
     AsyncFunction("getAccounts") { () -> [[String: Any?]] in
@@ -344,47 +308,6 @@ public class ExpoFinanceKitModule: Module {
       return "withdrawal"
     @unknown default:
       return "unknown"
-    }
-  }
-  
-  private func setupBackgroundNotificationObserver() {
-    let bundleId = Bundle.main.bundleIdentifier ?? "com.expo.financekit"
-    let notificationName = "\(bundleId).dataChanged" as CFString
-    let darwinCenter = CFNotificationCenterGetDarwinNotifyCenter()
-    
-    CFNotificationCenterAddObserver(
-      darwinCenter,
-      Unmanaged.passUnretained(self).toOpaque(),
-      { center, observer, name, object, userInfo in
-        guard let observer = observer else { return }
-        let module = Unmanaged<ExpoFinanceKitModule>.fromOpaque(observer).takeUnretainedValue()
-        module.handleFinanceDataChanged()
-      },
-      notificationName,
-      nil,
-      .deliverImmediately
-    )
-  }
-  
-  private func removeBackgroundNotificationObserver() {
-    let bundleId = Bundle.main.bundleIdentifier ?? "com.expo.financekit"
-    let notificationName = "\(bundleId).dataChanged" as CFString
-    let darwinCenter = CFNotificationCenterGetDarwinNotifyCenter()
-    
-    CFNotificationCenterRemoveObserver(
-      darwinCenter,
-      Unmanaged.passUnretained(self).toOpaque(),
-      notificationName,
-      nil
-    )
-  }
-  
-  private func handleFinanceDataChanged() {
-    DispatchQueue.main.async {
-      self.sendEvent("onFinanceDataChanged", [
-        "timestamp": Date().timeIntervalSince1970,
-        "source": "background_extension"
-      ])
     }
   }
 }

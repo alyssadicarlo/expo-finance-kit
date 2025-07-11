@@ -11,7 +11,6 @@ import {
   AuthorizationStatus,
   TransactionQueryOptions,
   AccountQueryOptions,
-  LastSyncInfo,
 } from '../ExpoFinanceKit.types';
 import {
   getAccounts,
@@ -28,11 +27,6 @@ import {
   getBalanceByAccount,
   getTotalBalance,
 } from '../modules/balances';
-import {
-  getLastSyncInfo,
-  backgroundDataListener,
-  isBackgroundSyncAvailable,
-} from '../modules/backgroundSync';
 import {
   getAuthorizationStatus,
   requestAuthorization,
@@ -337,60 +331,5 @@ export function useTransactionStream(
     loading,
     error,
     refetch: fetchTransactions,
-  };
-}
-
-/**
- * Hook to monitor background sync status
- * @param options - Hook options
- * @returns Background sync status and utilities
- */
-export function useBackgroundSync(options?: {
-  autoRefreshOnChange?: boolean;
-  onDataChanged?: () => void | Promise<void>;
-}) {
-  const [lastSyncInfo, setLastSyncInfo] = useState<LastSyncInfo>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchSyncInfo = useCallback(async () => {
-    try {
-      const info = await getLastSyncInfo();
-      setLastSyncInfo(info);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSyncInfo();
-
-    // Set up listener for background changes
-    const unsubscribe = backgroundDataListener.addListener(async (payload) => {
-      console.log('Background data changed:', payload);
-      
-      // Refresh sync info
-      await fetchSyncInfo();
-      
-      // Call custom handler if provided
-      if (options?.onDataChanged) {
-        await options.onDataChanged();
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [fetchSyncInfo, options]);
-
-  return {
-    lastSyncInfo,
-    loading,
-    error,
-    refetch: fetchSyncInfo,
-    isBackgroundSyncAvailable: isBackgroundSyncAvailable(),
   };
 }
