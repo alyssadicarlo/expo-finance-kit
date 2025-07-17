@@ -141,7 +141,7 @@ public class ExpoFinanceKitModule: Module {
       }
     }
 
-    AsyncFunction("getBalance") { () -> [[String: Any?]] in
+    AsyncFunction("getBalances") { () -> [[String: Any?]] in
       guard #available(iOS 17.4, *) else {
         throw FinanceKitError.unavailable
       }

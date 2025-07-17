@@ -344,7 +344,7 @@ export interface ExpoFinanceKitModule {
   // Data fetching
   getAccounts(options?: AccountQueryOptions): Promise<Account[]>;
   getTransactions(options?: TransactionQueryOptions): Promise<Transaction[]>;
-  getBalance(options?: BalanceQueryOptions): Promise<AccountBalance[]>;
+  getBalances(options?: BalanceQueryOptions): Promise<AccountBalance[]>;
   
   // Event handling
   addListener(eventName: keyof ExpoFinanceKitModuleEvents, listener: Function): void;

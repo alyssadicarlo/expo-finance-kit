@@ -34,7 +34,7 @@ export async function getBalances(
   }
 
   try {
-    const balances = await ExpoFinanceKit.getBalance();
+    const balances = await ExpoFinanceKit.getBalances();
     let filteredBalances = balances.map(transformBalance);
 
     // Apply filters

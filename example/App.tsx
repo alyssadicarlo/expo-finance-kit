@@ -20,7 +20,6 @@ import {
   useRecentTransactions,
   useAccountBalance,
   useTotalBalance,
-  useBackgroundSync,
   
   // Types
   Account,
@@ -33,7 +32,6 @@ import {
   generateSpendingInsights,
   calculateTransactionStats,
   groupTransactionsByDate,
-  setupAutoRefresh,
   
   // Formatters
   formatCurrency,
@@ -61,14 +59,6 @@ export default function App() {
   const { transactions, loading: transactionsLoading, refetch: refetchTransactions } = useRecentTransactions(100);
   const { balance: selectedBalance, refetch: refetchBalance } = useAccountBalance(selectedAccountId || undefined);
   const { totalBalance, refetch: refetchTotalBalance } = useTotalBalance();
-  
-  // Background sync hook
-  const { lastSyncInfo, isBackgroundSyncAvailable } = useBackgroundSync({
-    onDataChanged: async () => {
-      console.log('Background data changed - refreshing...');
-      await handleRefresh();
-    }
-  });
 
   // Filter transactions for selected account
   const accountTransactions = selectedAccountId
@@ -200,25 +190,7 @@ export default function App() {
         </View>
 
         {isAuthorized && (
-          <>
-            {/* Background Sync Status */}
-            {isBackgroundSyncAvailable && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Background Sync</Text>
-                <View style={styles.syncStatus}>
-                  <View style={styles.syncIndicator}>
-                    <View style={[styles.syncDot, { backgroundColor: '#4CAF50' }]} />
-                    <Text style={styles.syncText}>Background sync enabled</Text>
-                  </View>
-                  {lastSyncInfo?.last_sync_accounts && (
-                    <Text style={styles.syncTime}>
-                      Last sync: {formatRelativeDate(new Date(lastSyncInfo.last_sync_accounts.timestamp || '').getTime())}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            )}
-            
+          <>          
             {/* Total Balance Section */}
             {totalBalance && (
               <View style={styles.section}>
