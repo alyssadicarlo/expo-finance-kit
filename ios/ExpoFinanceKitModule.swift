@@ -42,23 +42,41 @@ public class ExpoFinanceKitModule: Module {
 
       let query = AccountQuery()
       let accounts = try await FinanceStore.shared.accounts(query: query)
-      return accounts.map { account in
-        var accountType: String = "unknown"
-        if account.assetAccount != nil {
-          accountType = "asset"
-        } else if account.liabilityAccount != nil {
-          accountType = "liability"
-        }
 
-        return [
-          "id": account.id.uuidString,
-          "displayName": account.displayName,
-          "institutionName": account.institutionName,
-          "accountDescription": account.accountDescription,
-          "currencyCode": account.currencyCode,
-          "accountType": accountType
-        ]
+      let balances = try await fetchBalances()
+
+      var result: [[String: Any?]] = []
+      
+      for account in accounts {
+        let accountId = account.id.uuidString
+        if let balance = balances.first(where: { $0["accountId"] as? String == accountId }) {
+          var amount = balance["amount"] as? Double ?? 0.0
+          
+          if let liabilityAccount = account.liabilityAccount,
+             let creditLimit = liabilityAccount.creditInformation.creditLimit {
+              amount = NSDecimalNumber(decimal: creditLimit.amount).doubleValue - amount
+          }
+          
+          var accountType: String = "unknown"
+          if account.assetAccount != nil {
+            accountType = "asset"
+          } else if account.liabilityAccount != nil {
+            accountType = "liability"
+          }
+
+          result.append([
+            "id": account.id.uuidString,
+            "displayName": account.displayName,
+            "institutionName": account.institutionName,
+            "accountDescription": account.accountDescription,
+            "currencyCode": account.currencyCode,
+            "accountType": accountType,
+            "balance": amount
+          ])
+        }
       }
+      
+      return result
     }
 
     AsyncFunction("getTransactions") {
@@ -252,6 +270,43 @@ public class ExpoFinanceKitModule: Module {
       return "authorized"
     @unknown default:
       return "unknown"
+    }
+  }
+  
+  @available(iOS 17.4, *)
+  private func fetchBalances() async throws -> [[String: Any?]] {
+    let authStatus = try await FinanceStore.shared.authorizationStatus()
+    guard authStatus == .authorized else {
+      throw FinanceKitError.unauthorized
+    }
+    
+    let query = AccountBalanceQuery()
+    let balances = try await FinanceStore.shared.accountBalances(query: query)
+    
+    var uniqueBalances: [String: AccountBalance] = [:]
+    for balance in balances {
+      let accountIdString = balance.accountID.uuidString
+      uniqueBalances[accountIdString] = balance
+    }
+    
+    return uniqueBalances.values.map { balance in
+      var amount: Decimal = 0.0
+      
+      switch balance.currentBalance {
+      case .available(let availableBalance):
+        amount = availableBalance.amount.amount
+      case .booked(let bookedBalance):
+        amount = bookedBalance.amount.amount
+      case .availableAndBooked(let availableBalance, _):
+        amount = availableBalance.amount.amount
+      }
+      
+      return [
+        "id": balance.id.uuidString,
+        "amount": NSDecimalNumber(decimal: amount).doubleValue,
+        "currencyCode": balance.currencyCode,
+        "accountId": balance.accountID.uuidString,
+      ]
     }
   }
 

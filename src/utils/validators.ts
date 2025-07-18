@@ -156,6 +156,7 @@ export function transformAccount(rawAccount: any): Account {
     accountDescription: rawAccount.accountDescription,
     currencyCode: rawAccount.currencyCode,
     accountType: rawAccount.accountType as AccountType,
+    balance: rawAccount.balance,
   };
 }
 

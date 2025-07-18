@@ -57,6 +57,7 @@ export interface Account {
   accountType: AccountType;
   createdAt?: number;
   lastUpdated?: number;
+  balance: number;
 }
 
 /**
