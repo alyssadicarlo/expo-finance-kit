@@ -3,6 +3,7 @@
  * Handles FinanceKit authorization flows and status management
  */
 
+import { Platform } from 'react-native';
 import ExpoFinanceKit from '../ExpoFinanceKitModule';
 import { 
   AuthorizationStatus,
@@ -17,6 +18,13 @@ import { createFinanceKitError } from '../utils/errors';
  * @returns Promise resolving to authorization result
  */
 export async function requestAuthorization(): Promise<AuthorizationResult> {
+  if (Platform.OS === 'android') {
+    return {
+      granted: false,
+      status: 'unavailable',
+    };
+  }
+  
   try {
     const granted = await ExpoFinanceKit.requestAuthorization();
     const status = await ExpoFinanceKit.getAuthorizationStatus();
@@ -39,6 +47,10 @@ export async function requestAuthorization(): Promise<AuthorizationResult> {
  * @returns Promise resolving to current authorization status
  */
 export async function getAuthorizationStatus(): Promise<AuthorizationStatus> {
+  if (Platform.OS === 'android') {
+    return 'unavailable';
+  }
+  
   try {
     const status = await ExpoFinanceKit.getAuthorizationStatus();
     return status as AuthorizationStatus;
@@ -53,6 +65,9 @@ export async function getAuthorizationStatus(): Promise<AuthorizationStatus> {
  * @returns Boolean indicating availability
  */
 export function isFinanceKitAvailable(): boolean {
+  if (Platform.OS === 'android') {
+    return false;
+  }
   return ExpoFinanceKit.isAvailable || false;
 }
 
