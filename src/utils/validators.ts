@@ -243,7 +243,7 @@ export function transformTransaction(rawTransaction: any): Transaction {
   return {
     id: rawTransaction.id,
     accountId: rawTransaction.accountId,
-    amount: Math.abs(rawTransaction.amount), // Ensure positive amount
+    amount: rawTransaction.amount, // Keep original amount sign
     currencyCode: rawTransaction.currencyCode,
     transactionDate: rawTransaction.transactionDate,
     merchantName: rawTransaction.merchantName,
@@ -254,6 +254,36 @@ export function transformTransaction(rawTransaction: any): Transaction {
     transactionType,
     creditDebitIndicator: rawTransaction.creditDebitIndicator as CreditDebitIndicator,
   };
+}
+
+/**
+ * Normalizes transaction amount based on account type and credit/debit indicator
+ * @param amount - The raw transaction amount
+ * @param accountType - The type of account (asset or liability)
+ * @param creditDebitIndicator - Whether the transaction is a credit or debit
+ * @returns Normalized amount (positive for increases in value, negative for decreases)
+ */
+export function normalizeTransactionAmount(
+  amount: number,
+  accountType: AccountType,
+  creditDebitIndicator: CreditDebitIndicator
+): number {
+  // For asset accounts:
+  // - Credits (deposits) are positive (increase asset value)
+  // - Debits (withdrawals) are negative (decrease asset value)
+  // 
+  // For liability accounts (e.g., credit cards):
+  // - Credits (payments) are negative (decrease debt)
+  // - Debits (charges) are positive (increase debt)
+  
+  const absAmount = Math.abs(amount);
+  
+  if (accountType === AccountType.Asset) {
+    return creditDebitIndicator === CreditDebitIndicator.Credit ? absAmount : -absAmount;
+  } else {
+    // Liability account
+    return creditDebitIndicator === CreditDebitIndicator.Debit ? absAmount : -absAmount;
+  }
 }
 
 /**

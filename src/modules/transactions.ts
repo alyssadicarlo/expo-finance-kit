@@ -5,6 +5,7 @@
 
 import ExpoFinanceKit from '../ExpoFinanceKitModule';
 import { 
+  Account,
   Transaction, 
   TransactionQueryOptions,
   TransactionStatus,
@@ -12,8 +13,9 @@ import {
   FinanceKitErrorCode 
 } from '../ExpoFinanceKit.types';
 import { ensureAuthorized } from '../helpers';
-import { validateTransactionQueryOptions, transformTransaction } from '../utils/validators';
+import { validateTransactionQueryOptions, transformTransaction, normalizeTransactionAmount } from '../utils/validators';
 import { createFinanceKitError } from '../utils/errors';
+import { getAccountById } from './accounts';
 
 /**
  * Fetches transactions based on query options
@@ -275,6 +277,52 @@ export function groupTransactionsByDate(
   });
 
   return grouped;
+}
+
+/**
+ * Normalizes transaction amounts based on their account types
+ * @param transactions - Array of transactions to normalize
+ * @returns Promise resolving to transactions with normalized amounts
+ */
+export async function normalizeTransactionAmounts(
+  transactions: Transaction[]
+): Promise<Transaction[]> {
+  // Create a map to cache account lookups
+  const accountCache = new Map<string, Account | null>();
+  
+  // Normalize each transaction
+  const normalizedTransactions = await Promise.all(
+    transactions.map(async (transaction) => {
+      // Check cache first
+      let account = accountCache.get(transaction.accountId);
+      
+      // If not in cache, fetch the account
+      if (account === undefined) {
+        account = await getAccountById(transaction.accountId);
+        accountCache.set(transaction.accountId, account);
+      }
+      
+      // If account not found, return transaction as-is
+      if (!account) {
+        console.warn(`Account not found for transaction ${transaction.id}, using original amount`);
+        return transaction;
+      }
+      
+      // Normalize the amount based on account type
+      const normalizedAmount = normalizeTransactionAmount(
+        transaction.amount,
+        account.accountType,
+        transaction.creditDebitIndicator
+      );
+      
+      return {
+        ...transaction,
+        amount: normalizedAmount
+      };
+    })
+  );
+  
+  return normalizedTransactions;
 }
 
 /**
