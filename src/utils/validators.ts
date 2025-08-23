@@ -275,14 +275,12 @@ export function normalizeTransactionAmount(
   // For liability accounts (e.g., credit cards):
   // - Credits (payments) are negative (decrease debt)
   // - Debits (charges) are positive (increase debt)
-  
-  const absAmount = Math.abs(amount);
-  
+
   if (accountType === AccountType.Asset) {
-    return creditDebitIndicator === CreditDebitIndicator.Credit ? absAmount : -absAmount;
+    return creditDebitIndicator === CreditDebitIndicator.Credit ? amount : -amount;
   } else {
     // Liability account
-    return creditDebitIndicator === CreditDebitIndicator.Debit ? absAmount : -absAmount;
+    return creditDebitIndicator === CreditDebitIndicator.Debit ? amount : -amount;
   }
 }
 
