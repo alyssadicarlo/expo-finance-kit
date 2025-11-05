@@ -10,6 +10,7 @@
  */
 export type ExpoFinanceKitModuleEvents = {
   onAuthorizationStatusChanged: (params: AuthorizationStatusChangedPayload) => void;
+  onTransactionsChanged: (params: TransactionsChangedPayload) => void;
 };
 
 /**
@@ -18,6 +19,18 @@ export type ExpoFinanceKitModuleEvents = {
 export type AuthorizationStatusChangedPayload = {
   status: AuthorizationStatus;
   timestamp: number;
+};
+
+/**
+ * Payload for transaction change events
+ */
+export type TransactionsChangedPayload = {
+  accountId: string;
+  timestamp: number;
+  inserted?: Transaction[];
+  updated?: Transaction[];
+  deleted?: string[]; // Array of transaction IDs
+  hasHistoryToken?: boolean;
 };
 
 // ==================== Authorization ====================
@@ -347,6 +360,14 @@ export interface ExpoFinanceKitModule {
   getTransactions(accountId?: string, startDate?: number, endDate?: number): Promise<Transaction[]>;
   getBalances(options?: BalanceQueryOptions): Promise<AccountBalance[]>;
   getBalanceForAccount(accountId: string): Promise<AccountBalance>;
+  
+  // Transaction monitoring
+  startMonitoringTransactions(accountIds?: string[]): Promise<void>;
+  stopMonitoringTransactions(): Promise<void>;
+  getHistoryToken(accountId: string): Promise<string | null>;
+  clearHistoryToken(accountId: string): Promise<void>;
+  setAppGroupIdentifier(identifier: string): Promise<void>;
+  processPendingChanges(): Promise<void>;
   
   // Event handling
   addListener(eventName: keyof ExpoFinanceKitModuleEvents, listener: Function): void;

@@ -32,6 +32,13 @@ import {
   requestAuthorization,
   authorizationListener,
 } from '../modules/authorization';
+import {
+  startMonitoringTransactions,
+  stopMonitoringTransactions,
+  addTransactionChangeListener,
+  isMonitoringTransactions,
+} from '../modules/monitoring';
+import { TransactionsChangedPayload } from '../ExpoFinanceKit.types';
 
 /**
  * Hook for managing authorization status
@@ -286,7 +293,8 @@ export function useTotalBalance() {
 }
 
 /**
- * Hook for real-time transaction updates
+ * Hook for real-time transaction updates (polling-based)
+ * @deprecated Use useTransactionMonitoring for FinanceKit native change streams
  */
 export function useTransactionStream(
   accountId?: string,
@@ -331,5 +339,96 @@ export function useTransactionStream(
     loading,
     error,
     refetch: fetchTransactions,
+  };
+}
+
+/**
+ * Hook for real-time transaction monitoring using FinanceKit change streams
+ * Provides batched updates when transactions are inserted, updated, or deleted
+ */
+export function useTransactionMonitoring(
+  accountIds?: string[],
+  options?: {
+    autoStart?: boolean;
+    onChanges?: (payload: TransactionsChangedPayload) => void;
+  }
+) {
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [changeCount, setChangeCount] = useState(0);
+  const autoStart = options?.autoStart ?? true;
+  const onChangesRef = useRef(options?.onChanges);
+
+  // Update callback ref when it changes
+  useEffect(() => {
+    onChangesRef.current = options?.onChanges;
+  }, [options?.onChanges]);
+
+  // Set up monitoring
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    const startMonitoring = async () => {
+      try {
+        setError(null);
+        await startMonitoringTransactions(accountIds);
+        setIsMonitoring(isMonitoringTransactions());
+
+        // Set up listener for changes
+        unsubscribe = addTransactionChangeListener((payload) => {
+          setChangeCount(prev => prev + 1);
+          if (onChangesRef.current) {
+            onChangesRef.current(payload);
+          }
+        });
+      } catch (err) {
+        setError(err as Error);
+        setIsMonitoring(false);
+      }
+    };
+
+    if (autoStart) {
+      startMonitoring();
+    }
+
+    // Cleanup
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+      stopMonitoringTransactions().catch(() => {
+        // Ignore cleanup errors
+      });
+      setIsMonitoring(false);
+    };
+  }, [accountIds?.join(','), autoStart]);
+
+  const start = useCallback(async () => {
+    try {
+      setError(null);
+      await startMonitoringTransactions(accountIds);
+      setIsMonitoring(isMonitoringTransactions());
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [accountIds]);
+
+  const stop = useCallback(async () => {
+    try {
+      await stopMonitoringTransactions();
+      setIsMonitoring(false);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, []);
+
+  return {
+    isMonitoring,
+    error,
+    changeCount,
+    start,
+    stop,
   };
 }

@@ -56,6 +56,20 @@ export {
   getBalanceHistory,
 } from './modules/balances';
 
+// Transaction monitoring
+export {
+  startMonitoringTransactions,
+  stopMonitoringTransactions,
+  addTransactionChangeListener,
+  removeAllTransactionChangeListeners,
+  isMonitoringTransactions,
+  clearHistoryToken,
+  setAppGroupIdentifier,
+  processPendingChanges,
+  transactionMonitor,
+  type TransactionChangeCallback,
+} from './modules/monitoring';
+
 // Utilities
 export {
   // Validators
@@ -115,6 +129,7 @@ export {
   useAccountBalance,
   useTotalBalance,
   useTransactionStream,
+  useTransactionMonitoring,
 } from './hooks/useFinanceKit';
 
 
@@ -126,6 +141,7 @@ export * as Accounts from './modules/accounts';
 export * as Transactions from './modules/transactions';
 export * as Balances from './modules/balances';
 export * as Authorization from './modules/authorization';
+export * as Monitoring from './modules/monitoring';
 export * as Formatters from './utils/formatters';
 export * as Analytics from './utils/analytics';
 export * as Validators from './utils/validators';

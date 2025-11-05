@@ -1,6 +1,6 @@
 {
   "name": "expo-finance-kit",
-  "version": "0.2.20",
+  "version": "0.2.21",
   "description": "Native Expo module for Apple FinanceKit - Access financial data from Apple Card and other accounts",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -48,5 +48,13 @@
     "expo": "*",
     "react": "*",
     "react-native": "*"
+  },
+  "expo": {
+    "name": "expo-finance-kit",
+    "slug": "expo-finance-kit",
+    "platforms": ["ios"],
+    "ios": {
+      "deploymentTarget": "17.4"
+    }
   }
 }

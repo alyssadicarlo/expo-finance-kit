@@ -8,6 +8,16 @@ export const withInfoPlist: ConfigPlugin<{ usageDescription: string }> = (
     // Add financial data usage description
     config.modResults.NSFinancialDataUsageDescription = usageDescription;
     
+    // Add background task identifiers for transaction syncing
+    if (!config.modResults.BGTaskSchedulerPermittedIdentifiers) {
+      config.modResults.BGTaskSchedulerPermittedIdentifiers = [];
+    }
+    const identifiers = config.modResults.BGTaskSchedulerPermittedIdentifiers as string[];
+    const backgroundTaskId = 'com.expo.financekit.sync';
+    if (!identifiers.includes(backgroundTaskId)) {
+      identifiers.push(backgroundTaskId);
+    }
+    
     return config;
   });
 };
