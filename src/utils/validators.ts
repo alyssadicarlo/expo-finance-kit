@@ -275,12 +275,15 @@ export function normalizeTransactionAmount(
   // For liability accounts (e.g., credit cards):
   // - Credits (payments) are negative (decrease debt)
   // - Debits (charges) are positive (increase debt)
+  
+  // Use absolute value first, as Apple FinanceKit may already encode the sign
+  const absoluteAmount = Math.abs(amount);
 
   if (accountType === AccountType.Asset) {
-    return creditDebitIndicator === CreditDebitIndicator.Credit ? amount : -amount;
+    return creditDebitIndicator === CreditDebitIndicator.Credit ? absoluteAmount : -absoluteAmount;
   } else {
     // Liability account
-    return creditDebitIndicator === CreditDebitIndicator.Debit ? amount : -amount;
+    return creditDebitIndicator === CreditDebitIndicator.Debit ? absoluteAmount : -absoluteAmount;
   }
 }
 
