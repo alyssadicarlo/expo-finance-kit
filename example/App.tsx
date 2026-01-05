@@ -134,7 +134,7 @@ export default function App() {
           item.creditDebitIndicator === 'credit' ? styles.creditAmount : styles.debitAmount
         ]}>
           {item.creditDebitIndicator === 'credit' ? '+' : '-'}
-          {formatCurrency(item.amount, item.currencyCode)}
+          {formatCurrency(Math.abs(item.amount), item.currencyCode)}
         </Text>
       </View>
       <View style={styles.transactionDetails}>
@@ -284,7 +284,7 @@ export default function App() {
                   <View key={transaction.id} style={styles.unusualTransaction}>
                     <Text>{transaction.merchantName || transaction.transactionDescription}</Text>
                     <Text style={styles.unusualAmount}>
-                      {formatCurrency(transaction.amount, transaction.currencyCode)}
+                      {formatCurrency(Math.abs(transaction.amount), transaction.currencyCode)}
                     </Text>
                   </View>
                 ))}
@@ -318,15 +318,15 @@ export default function App() {
               <View style={styles.insightsModal}>
                 <View style={styles.insightsContent}>
                   <Text style={styles.insightsTitle}>Spending Insights</Text>
-                  <Text>Total Spent: {formatCurrency(insights.totalSpent, 'USD')}</Text>
-                  <Text>Total Income: {formatCurrency(insights.totalIncome, 'USD')}</Text>
+                  <Text>Total Spent: {formatCurrency(Math.abs(insights.totalSpent), 'USD')}</Text>
+                  <Text>Total Income: {formatCurrency(Math.abs(insights.totalIncome), 'USD')}</Text>
                   <Text>Net Cash Flow: {formatCurrency(insights.netCashFlow, 'USD')}</Text>
                   
                   <Text style={styles.insightsSubtitle}>Top Categories</Text>
                   {insights.categoriesBreakdown.slice(0, 5).map((category, index) => (
                     <View key={index} style={styles.categoryItem}>
                       <Text>{category.category}</Text>
-                      <Text>{formatCurrency(category.amount, 'USD')} ({category.percentage.toFixed(1)}%)</Text>
+                      <Text>{formatCurrency(Math.abs(category.amount), 'USD')} ({category.percentage.toFixed(1)}%)</Text>
                     </View>
                   ))}
                   
