@@ -82,7 +82,8 @@ if (granted) {
   
   // Format currency for display
   transactions.forEach(transaction => {
-    console.log(`${transaction.merchantName}: ${formatCurrency(transaction.amount, transaction.currencyCode)}`);
+    const prefix = transaction.creditDebitIndicator === 'credit' ? '+' : '-';
+    console.log(`${transaction.merchantName}: ${prefix}${formatCurrency(Math.abs(transaction.amount), transaction.currencyCode)}`);
   });
 }
 ```
@@ -125,7 +126,10 @@ function MyFinanceApp() {
       {transactions.map(transaction => (
         <View key={transaction.id}>
           <Text>{transaction.merchantName || transaction.transactionDescription}</Text>
-          <Text>{formatCurrency(transaction.amount, transaction.currencyCode)}</Text>
+          <Text>
+            {transaction.creditDebitIndicator === 'credit' ? '+' : '-'}
+            {formatCurrency(Math.abs(transaction.amount), transaction.currencyCode)}
+          </Text>
           <Text>{formatRelativeDate(transaction.transactionDate)}</Text>
         </View>
       ))}
