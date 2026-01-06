@@ -51,8 +51,13 @@ export async function getTransactions(
       endDate
     );
 
-    // Transform and apply additional filters
+    // Transform transactions
     let filteredTransactions = transactions.map(transformTransaction);
+
+    // Normalize transaction amounts based on account types
+    // This ensures credits show as positive for asset accounts (like Apple Cash)
+    // and debits show as positive for liability accounts (like credit cards)
+    filteredTransactions = await normalizeTransactionAmounts(filteredTransactions);
 
     // Apply additional filters not supported natively
     if (options.minAmount !== undefined) {
